@@ -6,7 +6,13 @@ app = Flask(__name__)
 # Load your dataset (Books.xlsx must be uploaded to Render along with this file)
 books_df = pd.read_excel("Books.xlsx")
 
-@app.route("/", methods=["POST"])
+#Health check endpoint for browser and verification
+@app.route("/webhook", methods=["GET"])
+def verify_webhook():
+    return "Webhook endpoint is live! Please use POST requests for Dialogflow.", 200
+
+#Main webhook endpoint that now MATCHES Dialogflow settings
+@app.route("/webhook", methods=["POST"])
 def webhook():
     req = request.get_json(force=True)
     intent = req.get("queryResult", {}).get("intent", {}).get("displayName", "")
@@ -32,14 +38,19 @@ def webhook():
     elif intent == "search_book":
         title = str(params.get("book_title", "")).lower()
         if title:
+            #Search for specific books
             match = books_df[books_df["title"].str.lower().str.contains(title, na=False)]
             if not match.empty:
                 row = match.iloc[0]
                 response_text = f"I found '{row['title']}' by {row['author']} (Genre: {row['genre']})."
             else:
-                response_text = f"Sorry, I couldn’t find a book titled '{title}'."
+                #If book not found, recommend random book
+                row = books_df.sample(1).iloc[0]
+                response_text = f"Sorry, I couldn’t find a book titled '{title}'. How about '{row['title']}' by {row['author']}?"
         else:
-            response_text = "Please provide the book title."
+            #No title provided = recommend random book
+            row = books_df.sample(1).iloc[0]
+            response_text = f"I recommend '{row['title']}' by {row['author']} (Genre: {row['genre']})."
 
     # ----------------------
     # Intent: search_author
