@@ -3,6 +3,7 @@ import pandas as pd
 from deep_translator import GoogleTranslator
 from langdetect import detect
 import re
+from datetime import datetime, timedelta
 
 app = Flask(__name__)
 
@@ -15,30 +16,39 @@ books_df = pd.read_excel("Books.xlsx", dtype=str)
 # Convert Excel serial numbers in 'published_date' column to readable format
 def excel_date_to_str(date_str):
     """
-    Convert Excel serial to dd/mm/yyyy if it's a serial number,
-    otherwise keep as-is (year or yyyy-mm).
+    Convert Excel serial numbers to dd/mm/yyyy.
+    Keep original string if it's year-only (yyyy) or year-month (yyyy-mm).
     """
     if pd.isna(date_str):
         return ""
+    
+    s = str(date_str).strip()
+    
+    # If it's exactly 4 digits, assume it's a year
+    if re.fullmatch(r"\d{4}", s):
+        return s
+    
+    # If it's yyyy-mm format, keep as-is
+    if re.fullmatch(r"\d{4}-\d{1,2}", s):
+        return s
+    
+    # Try to convert Excel serial to date
     try:
-        # Check if it's a float/int (Excel serial)
-        val = float(date_str)
-        # Excel serial 1 = 1900-01-01
-        from datetime import datetime, timedelta
-        dt = datetime(1899, 12, 30) + timedelta(days=int(val))
-        # Only convert if val > 59 (to skip Excel leap-year bug)
-        if val > 59:
+        val = float(s)
+        if val > 59:  # skip Excel leap-year bug
+            dt = datetime(1899, 12, 30) + timedelta(days=int(val))
             return dt.strftime("%d/%m/%Y")
     except:
         pass
-    # Keep original string for year-only or yyyy-mm
-    return str(date_str)
+    
+    # Otherwise, keep as string
+    return s
 
 books_df["published_date"] = books_df["published_date"].apply(excel_date_to_str)
 
-# --------------
+# --------------------------
 # Translation
-# --------------
+# --------------------------
 def translate_to_english(text: str) -> str:
     try:
         return GoogleTranslator(source="auto", target="en").translate(text)
@@ -56,7 +66,6 @@ def translate_back(text: str, target_lang: str) -> str:
 def safe_detect_language(text: str) -> str:
     try:
         lang = detect(text)
-        # Override if only ASCII letters/punctuations
         if re.fullmatch(r"[A-Za-z0-9\s\?\!\'\,\.\-]+", text):
             return "en"
         return lang
@@ -104,15 +113,9 @@ def webhook():
     if intent == "greet":
         response_text = "Hello! How can I help you with books today?"
 
-    # ----------------------
-    # Intent: goodbye
-    # ----------------------
     elif intent == "goodbye":
         response_text = "Goodbye! Happy reading 📖"
 
-    # ----------------------
-    # Intent: search_book
-    # ----------------------
     elif intent == "search_book":
         title = str(params.get("book_title", ""))
         if title:
@@ -154,9 +157,6 @@ Average Rating: {row['average_rating']}
 Description: {row['description']}
 Thumbnail: {row['thumbnail']}"""
 
-    # ----------------------
-    # Intent: search_author
-    # ----------------------
     elif intent == "search_author":
         author = str(params.get("author", ""))
         if author:
@@ -169,9 +169,6 @@ Thumbnail: {row['thumbnail']}"""
         else:
             response_text = "Please provide an author name."
 
-    # ----------------------
-    # Intent: book_page
-    # ----------------------
     elif intent == "book_page":
         title = str(params.get("book_title", ""))
         match = safe_search("title", title)
@@ -181,9 +178,6 @@ Thumbnail: {row['thumbnail']}"""
         else:
             response_text = f"Sorry, I couldn’t find page count for '{title}'."
 
-    # ------------------------
-    # Intent: search_by_genre
-    # ------------------------
     elif intent == "search_by_genre":
         genre = str(params.get("genre", ""))
         match = safe_search("genre", genre)
@@ -193,9 +187,6 @@ Thumbnail: {row['thumbnail']}"""
         else:
             response_text = f"Sorry, I couldn’t find books in the {genre} genre."
 
-    # ----------------------
-    # Intent: get_book_genre
-    # ----------------------
     elif intent == "get_book_genre":
         title = str(params.get("book_title", ""))
         match = safe_search("title", title)
@@ -205,9 +196,6 @@ Thumbnail: {row['thumbnail']}"""
         else:
             response_text = f"Sorry, I couldn’t find genre for '{title}'."
 
-    # ------------------------
-    # Intent: book_description
-    # ------------------------
     elif intent == "book_description":
         title = str(params.get("book_title", ""))
         match = safe_search("title", title)
@@ -217,9 +205,6 @@ Thumbnail: {row['thumbnail']}"""
         else:
             response_text = f"Sorry, I couldn’t find a description for '{title}'."
 
-    # ----------------------
-    # Intent: published_date
-    # ----------------------
     elif intent == "published_date":
         title = str(params.get("book_title", ""))
         match = safe_search("title", title)
@@ -229,9 +214,6 @@ Thumbnail: {row['thumbnail']}"""
         else:
             response_text = f"Sorry, I couldn’t find the published date for '{title}'."
 
-    # ----------------------
-    # Intent: publisher
-    # ----------------------
     elif intent == "publisher":
         title = str(params.get("book_title", ""))
         match = safe_search("title", title)
@@ -241,9 +223,6 @@ Thumbnail: {row['thumbnail']}"""
         else:
             response_text = f"Sorry, I couldn’t find the publisher for '{title}'."
 
-    # ----------------------
-    # Intent: average_rating
-    # ----------------------
     elif intent == "average_rating":
         title = str(params.get("book_title", ""))
         match = safe_search("title", title)
@@ -253,9 +232,6 @@ Thumbnail: {row['thumbnail']}"""
         else:
             response_text = f"Sorry, I couldn’t find ratings for '{title}'."
 
-    # ----------------------
-    # Intent: thumbnail
-    # ----------------------
     elif intent == "thumbnail":
         title = str(params.get("book_title", ""))
         match = safe_search("title", title)
@@ -265,9 +241,6 @@ Thumbnail: {row['thumbnail']}"""
         else:
             response_text = f"Sorry, I couldn’t find a cover for '{title}'."
 
-    # ----------------------
-    # Intent: bot_challenge
-    # ----------------------
     elif intent == "bot_challenge":
         response_text = "I’m a book assistant bot 🤖, here to help you discover books!"
 
