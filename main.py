@@ -9,9 +9,9 @@ app = Flask(__name__)
 # Load dataset
 books_df = pd.read_excel("Books.xlsx")
 
-# -------------
+# ----------------------
 # Translation
-# -------------
+# ----------------------
 def translate_to_english(text: str) -> str:
     """Translate text to English."""
     try:
@@ -30,9 +30,9 @@ def translate_back(text: str, target_lang: str) -> str:
         print(f"[ERROR] Back translation failed: {e}")
         return text
 
-# --------------------------
+# ----------------------
 # Safe language detection
-# --------------------------
+# ----------------------
 def safe_detect_language(text: str) -> str:
     """Detect language, force English if only ASCII letters/punctuation are found."""
     try:
@@ -45,16 +45,28 @@ def safe_detect_language(text: str) -> str:
     except:
         return "en"
 
-# --------------------------
+# ----------------------
+# Format published date
+# ----------------------
+def format_date(date_value):
+    """Convert Excel serial/date to readable string."""
+    if pd.isna(date_value):
+        return "Unknown"
+    try:
+        return pd.to_datetime(date_value).strftime("%d/%m/%Y")
+    except:
+        return str(date_value)
+
+# ----------------------
 # Health check endpoint
-# --------------------------
+# ----------------------
 @app.route("/webhook", methods=["GET"])
 def verify_webhook():
     return "Webhook endpoint is live! Please use POST requests for Dialogflow.", 200
 
-# --------------------------
+# ----------------------
 # Main webhook endpoint
-# --------------------------
+# ----------------------
 @app.route("/webhook", methods=["POST"])
 def webhook():
     req = request.get_json(force=True)
@@ -100,36 +112,39 @@ def webhook():
             match = books_df[books_df["title"].str.lower().str.contains(safe_title, na=False, regex=True)]
             if not match.empty:
                 row = match.iloc[0]
+                pub_date_str = format_date(row.get('published_date'))
                 response_text = f"""I found a book 📕 for you!            
 Title: {row['title']}
 Author: {row['author']}
 Genre: {row['genre']}
 Publisher: {row['publisher']}
-Published Date: {row['published_date']}
+Published Date: {pub_date_str}
 Pages: {row['pages']}
 Average Rating: {row['average_rating']}
 Description: {row['description']}
-Thumbnail: {row['thumbnail']}"""            
+Thumbnail: {row['thumbnail']}"""
             else:
                 row = books_df.sample(1).iloc[0]
+                pub_date_str = format_date(row.get('published_date'))
                 response_text = f"""Sorry, I couldn’t find a book titled '{title}'. 
 How about this one instead?
 Title: {row['title']}
 Author: {row['author']}
 Publisher: {row['publisher']}
-Published Date: {row['published_date']}
+Published Date: {pub_date_str}
 Pages: {row['pages']}
 Average Rating: {row['average_rating']}
 Description: {row['description']}
-Thumbnail: {row['thumbnail']}"""  
-        else:                
+Thumbnail: {row['thumbnail']}"""
+        else:
             row = books_df.sample(1).iloc[0]
+            pub_date_str = format_date(row.get('published_date'))
             response_text = f"""I recommend this book for you:
 Title: {row['title']}
 Author: {row['author']}
 Genre: {row['genre']}
 Publisher: {row['publisher']}
-Published Date: {row['published_date']}
+Published Date: {pub_date_str}
 Pages: {row['pages']}
 Average Rating: {row['average_rating']}
 Description: {row['description']}
@@ -203,16 +218,17 @@ Thumbnail: {row['thumbnail']}"""
         else:
             response_text = f"Sorry, I couldn’t find a description for '{title}'."
 
-    # ------------------------
+    # ----------------------
     # Intent: published_date
-    # ------------------------
+    # ----------------------
     elif intent == "published_date":
         title = str(params.get("book_title", "")).lower()
         safe_title = re.escape(title)
         match = books_df[books_df["title"].str.lower().str.contains(safe_title, na=False, regex=True)]
         if not match.empty:
             row = match.iloc[0]
-            response_text = f"'{row['title']}' was published on {row['published_date']}."
+            pub_date_str = format_date(row.get('published_date'))
+            response_text = f"'{row['title']}' was published on {pub_date_str}."
         else:
             response_text = f"Sorry, I couldn’t find the published date for '{title}'."
 
