@@ -1,6 +1,5 @@
 from flask import Flask, request, jsonify
 import pandas as pd
-from spellchecker import SpellChecker
 from deep_translator import GoogleTranslator
 
 app = Flask(__name__)
@@ -8,18 +7,9 @@ app = Flask(__name__)
 # Load dataset
 books_df = pd.read_excel("Books.xlsx")
 
-# Initialize spell checker
-spell = SpellChecker()
-
 # --------------------------
-# Extra functions
+# Translation
 # --------------------------
-def correct_spelling(text: str) -> str:
-    """Correct spelling mistakes in user input."""
-    words = text.split()
-    corrected_words = [spell.correction(w) or w for w in words]
-    return " ".join(corrected_words)
-
 def translate_to_english(text: str) -> (str, str):
     """Translate text to English and detect language."""
     try:
@@ -57,16 +47,12 @@ def webhook():
     intent = req.get("queryResult", {}).get("intent", {}).get("displayName", "")
     params = req.get("queryResult", {}).get("parameters", {})
 
-    #spelling check
-    corrected_query = correct_spelling(query_text)
-
     #Translate to English
     translated_query, detected_lang = translate_to_english(corrected_query)
 
     #Debug log
     print("\n[DEBUG] -------------------------")
     print(f"Original query   : {query_text}")
-    print(f"Corrected query  : {corrected_query}")
     print(f"Translated query : {translated_query}")
     print(f"Detected lang    : {detected_lang}")
     print(f"Intent           : {intent}")
@@ -95,7 +81,14 @@ def webhook():
             match = books_df[books_df["title"].str.lower().str.contains(title, na=False)]
             if not match.empty:
                 row = match.iloc[0]
-                response_text = f"I found '{row['title']}' by {row['author']} (Genre: {row['genre']})."
+                response_text = f"I found '{row['title']}' by Author: {row['author']} 
+                \nGenre: {row['genre']}
+                \nPublisher: {row['publisher']}
+                \nPublish Date: {row['publish_date']}
+                \nPages: {row['pages']}
+                \nAverage Rating: {row['average_rating']}
+                \nDescription:{row['description']}
+                \nThumbnail: {row['thumbnail']}."
             else:
                 row = books_df.sample(1).iloc[0]
                 response_text = f"Sorry, I couldn’t find a book titled '{title}'. How about '{row['title']}' by {row['author']}?"
@@ -230,3 +223,4 @@ def webhook():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
+
