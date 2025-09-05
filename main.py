@@ -9,67 +9,54 @@ app = Flask(__name__)
 # --------------------------
 # Load dataset
 # --------------------------
-# Load all columns as strings to preserve Excel display
-books_df = pd.read_excel("Books.xlsx", dtype=str)
+# Read published_date as string to preserve all formats
+books_df = pd.read_excel("Books.xlsx", dtype={"published_date": str})
 
-# Convert Excel serial numbers in 'published_date' column to readable format
-def excel_date_to_str(date_str):
-    """
-    Convert Excel serial to dd/mm/yyyy if it's a serial number,
-    otherwise keep as-is (year or yyyy-mm).
-    """
-    if pd.isna(date_str):
-        return ""
-    try:
-        val = float(date_str)
-        # Excel serials for dates are between 1 and ~100000 (about year 2173)
-        if 1 <= val < 100000:
-            from datetime import datetime, timedelta
-            dt = datetime(1899, 12, 30) + timedelta(days=int(val))
-            return dt.strftime("%d/%m/%Y")
-    except:
-        pass
-    # Keep original string for year-only or yyyy-mm
-    return str(date_str)
-
-books_df["published_date"] = books_df["published_date"].apply(excel_date_to_str)
-
-# --------------
+# --------------------------
 # Translation
-# --------------
+# --------------------------
 def translate_to_english(text: str) -> str:
+    """Translate text to English."""
     try:
         return GoogleTranslator(source="auto", target="en").translate(text)
-    except:
+    except Exception as e:
+        print(f"[ERROR] Translation to English failed: {e}")
         return text
 
 def translate_back(text: str, target_lang: str) -> str:
+    """Translate English response back to original language."""
     try:
         if target_lang != "en":
             return GoogleTranslator(source="en", target=target_lang).translate(text)
         return text
-    except:
+    except Exception as e:
+        print(f"[ERROR] Back translation failed: {e}")
         return text
 
+# --------------------------
+# Safe language detection
+# --------------------------
 def safe_detect_language(text: str) -> str:
+    """Detect language, force English if only ASCII letters/punctuation are found."""
     try:
         lang = detect(text)
-        # Override if only ASCII letters/punctuations
-        if re.fullmatch(r"[A-Za-z0-9\s\?\!\'\,\.\-]+", text):
-            return "en"
+        if lang != "en":
+            if re.fullmatch(r"[A-Za-z0-9\s\?\!\'\,\.\-]+", text):
+                print(f"[DEBUG] Overriding langdetect result ({lang}) -> en")
+                return "en"
         return lang
     except:
         return "en"
 
 # --------------------------
-# Health check
+# Health check endpoint
 # --------------------------
 @app.route("/webhook", methods=["GET"])
 def verify_webhook():
     return "Webhook endpoint is live! Please use POST requests for Dialogflow.", 200
 
 # --------------------------
-# Main webhook
+# Main webhook endpoint
 # --------------------------
 @app.route("/webhook", methods=["POST"])
 def webhook():
@@ -78,7 +65,9 @@ def webhook():
     intent = req.get("queryResult", {}).get("intent", {}).get("displayName", "")
     params = req.get("queryResult", {}).get("parameters", {})
 
+    # Detect user language
     detected_lang = safe_detect_language(query_text)
+    # Translate to English
     translated_query = translate_to_english(query_text)
 
     print("\n[DEBUG] -------------------------")
@@ -277,4 +266,5 @@ Thumbnail: {row['thumbnail']}"""
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
+
 
