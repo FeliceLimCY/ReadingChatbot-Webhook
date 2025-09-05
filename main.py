@@ -8,53 +8,69 @@ app = Flask(__name__)
 # Load dataset
 books_df = pd.read_excel("Books.xlsx")
 
-# Spell checker
+# Initialize spell checker
 spell = SpellChecker()
 
+# --------------------------
+# Extra functions
+# --------------------------
 def correct_spelling(text: str) -> str:
-    """Corrects spelling mistakes in user input."""
-    tokens = text.split()
-    corrected = [spell.correction(w) if spell.unknown([w]) else w for w in tokens]
-    return " ".join(corrected)
+    """Correct spelling mistakes in user input."""
+    words = text.split()
+    corrected_words = [spell.correction(w) or w for w in words]
+    return " ".join(corrected_words)
 
 def translate_to_english(text: str) -> (str, str):
-    """Translate any language to English, return translated text and detected lang."""
+    """Translate text to English and detect language."""
     try:
-        translated = GoogleTranslator(source='auto', target='en').translate(text)
-        detected_lang = GoogleTranslator(source='auto', target='en').source
+        translated = GoogleTranslator(source="auto", target="en").translate(text)
+        detected_lang = GoogleTranslator(source="auto", target="en").source
         return translated, detected_lang
-    except:
+    except Exception as e:
+        print(f"[ERROR] Translation to English failed: {e}")
         return text, "en"
 
 def translate_back(text: str, target_lang: str) -> str:
-    """Translate response back to user's language if not English."""
+    """Translate English response back to original language."""
     try:
         if target_lang != "en":
-            return GoogleTranslator(source='en', target=target_lang).translate(text)
+            return GoogleTranslator(source="en", target=target_lang).translate(text)
         return text
-    except:
+    except Exception as e:
+        print(f"[ERROR] Back translation failed: {e}")
         return text
 
+# --------------------------
+# Health check endpoint
+# --------------------------
+@app.route("/webhook", methods=["GET"])
+def verify_webhook():
+    return "Webhook endpoint is live! Please use POST requests for Dialogflow.", 200
 
+# --------------------------
+# Main webhook endpoint
+# --------------------------
 @app.route("/webhook", methods=["POST"])
 def webhook():
     req = request.get_json(force=True)
-
-    # Raw user input
-    user_text = req.get("queryResult", {}).get("queryText", "")
-
-    # Step 1: Fix spelling
-    corrected_text = correct_spelling(user_text)
-
-    # Step 2: Translate to English for intent matching
-    translated_text, detected_lang = translate_to_english(corrected_text)
-
-    # Replace user's text with cleaned English version
-    req["queryResult"]["queryText"] = translated_text
-
-    # Intent + parameters
+    query_text = req.get("queryResult", {}).get("queryText", "")
     intent = req.get("queryResult", {}).get("intent", {}).get("displayName", "")
     params = req.get("queryResult", {}).get("parameters", {})
+
+    #spelling check
+    corrected_query = correct_spelling(query_text)
+
+    #Translate to English
+    translated_query, detected_lang = translate_to_english(corrected_query)
+
+    #Debug log
+    print("\n[DEBUG] -------------------------")
+    print(f"Original query   : {query_text}")
+    print(f"Corrected query  : {corrected_query}")
+    print(f"Translated query : {translated_query}")
+    print(f"Detected lang    : {detected_lang}")
+    print(f"Intent           : {intent}")
+    print("-------------------------------\n")
 
     response_text = "Sorry, I didn’t get that."
 
@@ -204,10 +220,10 @@ def webhook():
     elif intent == "bot_challenge":
         response_text = "I’m a book assistant bot 🤖, here to help you discover books!"
 
-    # ----------------------
-    # Translate back if needed
-    # ----------------------
+    #Translate back to user’s language
     response_text = translate_back(response_text, detected_lang)
+
+    print(f"[DEBUG] Final response (before sending): {response_text}\n")
 
     return jsonify({"fulfillmentText": response_text})
 
