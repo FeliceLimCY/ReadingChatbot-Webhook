@@ -10,28 +10,46 @@ app = Flask(__name__)
 # --------------------------
 # Excel Date Fix Function
 # --------------------------
-def excel_date_to_str(value: str) -> str:
-    """Convert Excel serial dates to dd/mm/yyyy, keep text formats as-is."""
+def excel_date_to_str(value) -> str:
+    """Convert Excel cell values into readable dates or keep original text/year."""
     try:
-        # If it's just digits
-        if value.isdigit():
+        # If it's empty or NaN
+        if pd.isna(value):
+            return ""
+
+        # Already string → keep as-is (covers '2000-09', '2005', '04/03/2013')
+        if isinstance(value, str):
+            return value.strip()
+
+        # If it's a number (int/float)
+        if isinstance(value, (int, float)):
             num = int(value)
-            # Treat small numbers as Excel serial dates (usually < 60000 ~ year 2064)
-            if 30 < num < 60000:  
+
+            # If it's clearly a year (1000–2100) → keep as year
+            if 1000 <= num <= 2100:
+                return str(num)
+
+            # If it's within Excel serial date range
+            if 30 < num < 60000:
                 base_date = datetime(1899, 12, 30)
                 fixed_date = base_date + timedelta(days=num)
                 return fixed_date.strftime("%d/%m/%Y")
-            else:
-                # It's probably just a year like "1990"
-                return value
-        return value  # keep values like "2000-09", "2005", "04/03/2013"
-    except:
-        return value
+
+            return str(num)  # fallback
+
+        # If it's a datetime object
+        if isinstance(value, datetime):
+            return value.strftime("%d/%m/%Y")
+
+        return str(value)
+
+    except Exception:
+        return str(value)
         
 # --------------------------
 # Load dataset
 # --------------------------
-books_df = pd.read_excel("Books.xlsx", dtype=str).fillna("").astype(str)
+books_df = pd.read_excel("Books.xlsx", dtype=str)
 
 # Fix published_date column
 if "published_date" in books_df.columns:
@@ -298,4 +316,5 @@ Thumbnail: {row['thumbnail']}"""
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
+
 
