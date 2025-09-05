@@ -21,13 +21,11 @@ def excel_date_to_str(date_str):
     if pd.isna(date_str):
         return ""
     try:
-        # Check if it's a float/int (Excel serial)
         val = float(date_str)
-        # Excel serial 1 = 1900-01-01
-        from datetime import datetime, timedelta
-        dt = datetime(1899, 12, 30) + timedelta(days=int(val))
-        # Only convert if val > 59 (to skip Excel leap-year bug)
-        if val > 59:
+        # Excel serials for dates are between 1 and ~100000 (about year 2173)
+        if 1 <= val < 100000:
+            from datetime import datetime, timedelta
+            dt = datetime(1899, 12, 30) + timedelta(days=int(val))
             return dt.strftime("%d/%m/%Y")
     except:
         pass
@@ -279,3 +277,4 @@ Thumbnail: {row['thumbnail']}"""
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
+
