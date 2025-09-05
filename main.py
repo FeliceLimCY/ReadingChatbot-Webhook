@@ -1,56 +1,44 @@
 from flask import Flask, request, jsonify
 import pandas as pd
 from spellchecker import SpellChecker
-from googletrans import Translator
-import logging
+from deep_translator import GoogleTranslator
 
 app = Flask(__name__)
-
-# --------------------------
-# Setup logging
-# --------------------------
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(message)s",
-)
 
 # Load dataset
 books_df = pd.read_excel("Books.xlsx")
 
-# Initialize spell checker and translator
+# Initialize spell checker
 spell = SpellChecker()
-translator = Translator()
 
 # --------------------------
-# Utility functions
+# Extra functions
 # --------------------------
 def correct_spelling(text: str) -> str:
     """Correct spelling mistakes in user input."""
     words = text.split()
     corrected_words = [spell.correction(w) or w for w in words]
-    corrected = " ".join(corrected_words)
-    if corrected != text:
-        logging.info(f"Spelling corrected: '{text}' → '{corrected}'")
-    return corrected
+    return " ".join(corrected_words)
 
 def translate_to_english(text: str) -> (str, str):
-    """Detect language and translate to English if needed."""
-    detected = translator.detect(text)
-    lang = detected.lang
-    if lang != "en":
-        translated = translator.translate(text, dest="en").text
-        logging.info(f"Translated to English: '{text}' ({lang}) → '{translated}'")
-        return translated, lang
-    logging.info(f"No translation needed (English detected): '{text}'")
-    return text, "en"
+    """Translate text to English and detect language."""
+    try:
+        translated = GoogleTranslator(source="auto", target="en").translate(text)
+        detected_lang = GoogleTranslator(source="auto", target="en").source
+        return translated, detected_lang
+    except Exception as e:
+        print(f"[ERROR] Translation to English failed: {e}")
+        return text, "en"
 
 def translate_back(text: str, target_lang: str) -> str:
     """Translate English response back to original language."""
-    if target_lang != "en":
-        translated = translator.translate(text, dest=target_lang).text
-        logging.info(f"Translated back to {target_lang}: '{text}' → '{translated}'")
-        return translated
-    return text
+    try:
+        if target_lang != "en":
+            return GoogleTranslator(source="en", target=target_lang).translate(text)
+        return text
+    except Exception as e:
+        print(f"[ERROR] Back translation failed: {e}")
+        return text
 
 # --------------------------
 # Health check endpoint
@@ -69,16 +57,20 @@ def webhook():
     intent = req.get("queryResult", {}).get("intent", {}).get("displayName", "")
     params = req.get("queryResult", {}).get("parameters", {})
 
-    logging.info(f"Incoming request → Intent: {intent}, Query: '{query_text}'")
-
-    # ✅ Step 1: Fix spelling
+    #spelling check
     corrected_query = correct_spelling(query_text)
 
-    # ✅ Step 2: Translate to English (Dialogflow works best in English)
+    #Translate to English
     translated_query, detected_lang = translate_to_english(corrected_query)
 
-    # Replace Dialogflow query with cleaned version
-    req["queryResult"]["queryText"] = translated_query
+    #Debug log
+    print("\n[DEBUG] -------------------------")
+    print(f"Original query   : {query_text}")
+    print(f"Corrected query  : {corrected_query}")
+    print(f"Translated query : {translated_query}")
+    print(f"Detected lang    : {detected_lang}")
+    print(f"Intent           : {intent}")
+    print("-------------------------------\n")
 
     response_text = "Sorry, I didn’t get that."
 
@@ -228,10 +220,10 @@ def webhook():
     elif intent == "bot_challenge":
         response_text = "I’m a book assistant bot 🤖, here to help you discover books!"
 
-    # ✅ Step 3: Translate back to user’s language
+    #Translate back to user’s language
     response_text = translate_back(response_text, detected_lang)
 
-    logging.info(f"Final response (to user in {detected_lang}): {response_text}")
+    print(f"[DEBUG] Final response (before sending): {response_text}\n")
 
     return jsonify({"fulfillmentText": response_text})
 
