@@ -7,26 +7,29 @@ import re
 app = Flask(__name__)
 
 # --------------------------
+# Excel Date Fix Function
+# --------------------------
+def excel_date_to_str(value: str) -> str:
+    """Convert Excel serial dates to dd/mm/yyyy, keep text formats as-is."""
+    try:
+        # Excel's base date = 1899-12-30
+        base_date = datetime(1899, 12, 30)
+        if value.isdigit():  # e.g., "41337"
+            days = int(value)
+            fixed_date = base_date + timedelta(days=days)
+            return fixed_date.strftime("%d/%m/%Y")
+        return value  # keep values like "2000-09", "2005"
+    except:
+        return value
+
+# --------------------------
 # Load dataset
 # --------------------------
-books_df = pd.read_excel("Books.xlsx", dtype={"published_date": object})
+books_df = pd.read_excel("Books.xlsx", dtype=str).fillna("").astype(str)
 
-# Fix published_date
-def excel_date_to_str(value):
-    if pd.isna(value):
-        return ""
-    if isinstance(value, str):
-        return value.strip()
-    if isinstance(value, pd.Timestamp):
-        # Format full date as dd/mm/yyyy
-        return value.strftime("%d/%m/%Y")
-    try:
-        # If it’s a float (Excel serial), convert to date first
-        return pd.to_datetime("1899-12-30") + pd.to_timedelta(int(value), "D")
-    except:
-        return str(value)
-
-books_df["published_date"] = books_df["published_date"].apply(excel_date_to_str)
+# Fix published_date column
+if "published_date" in books_df.columns:
+    books_df["published_date"] = books_df["published_date"].apply(excel_date_to_str)
 
 # --------------------------
 # Translation
@@ -282,6 +285,7 @@ Thumbnail: {row['thumbnail']}"""
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
+
 
 
 
