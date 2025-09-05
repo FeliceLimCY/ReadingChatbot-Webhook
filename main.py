@@ -81,14 +81,14 @@ def webhook():
             match = books_df[books_df["title"].str.lower().str.contains(title, na=False)]
             if not match.empty:
                 row = match.iloc[0]
-                response_text = f"I found '{row['title']}' by Author: {row['author']} 
-                \nGenre: {row['genre']}
-                \nPublisher: {row['publisher']}
-                \nPublish Date: {row['publish_date']}
-                \nPages: {row['pages']}
-                \nAverage Rating: {row['average_rating']}
-                \nDescription:{row['description']}
-                \nThumbnail: {row['thumbnail']}."
+                response_text = f"""I found '{row['title']}' by Author: {row['author']} 
+                Genre: {row['genre']}
+                Publisher: {row['publisher']}
+                Publish Date: {row['publish_date']}
+                Pages: {row['pages']}
+                Average Rating: {row['average_rating']}
+                Description:{row['description']}
+                Thumbnail: {row['thumbnail']}"""
             else:
                 row = books_df.sample(1).iloc[0]
                 response_text = f"Sorry, I couldn’t find a book titled '{title}'. How about '{row['title']}' by {row['author']}?"
@@ -223,4 +223,5 @@ def webhook():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
+
 
