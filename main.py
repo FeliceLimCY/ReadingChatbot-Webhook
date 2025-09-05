@@ -11,25 +11,28 @@ app = Flask(__name__)
 # Excel Date Fix Function
 # --------------------------
 def excel_date_to_str(value) -> str:
-    """Convert Excel cell values into readable dates or keep original text/year."""
+    """Convert Excel cell values into readable dates, keep original text/year."""
     try:
-        # If it's empty or NaN
         if pd.isna(value):
             return ""
 
-        # Already string → keep as-is (covers '2000-09', '2005', '04/03/2013')
+        # If it's a string, keep as-is (covers '2000-09', '2005', '10/08/2021')
         if isinstance(value, str):
             return value.strip()
 
-        # If it's a number (int/float)
+        # If it's a datetime object, format as dd/mm/yyyy
+        if isinstance(value, datetime):
+            return value.strftime("%d/%m/%Y")
+
+        # If it's a number
         if isinstance(value, (int, float)):
             num = int(value)
 
-            # If it's clearly a year (1000–2100) → keep as year
+            # If clearly a year (1000–2100), keep as year
             if 1000 <= num <= 2100:
                 return str(num)
 
-            # If it's within Excel serial date range
+            # If likely an Excel serial number, convert to dd/mm/yyyy
             if 30 < num < 60000:
                 base_date = datetime(1899, 12, 30)
                 fixed_date = base_date + timedelta(days=num)
@@ -37,15 +40,11 @@ def excel_date_to_str(value) -> str:
 
             return str(num)  # fallback
 
-        # If it's a datetime object
-        if isinstance(value, datetime):
-            return value.strftime("%d/%m/%Y")
-
         return str(value)
 
     except Exception:
         return str(value)
-        
+
 # --------------------------
 # Load dataset
 # --------------------------
@@ -55,9 +54,9 @@ books_df = pd.read_excel("Books.xlsx", dtype=str)
 if "published_date" in books_df.columns:
     books_df["published_date"] = books_df["published_date"].apply(excel_date_to_str)
 
-# -------------
+# --------------------------
 # Translation
-# -------------
+# --------------------------
 def translate_to_english(text: str) -> str:
     """Translate text to English."""
     try:
@@ -236,28 +235,28 @@ Thumbnail: {row['thumbnail']}"""
         else:
             response_text = f"Sorry, I couldn’t find genre for '{title}'."
 
-    # ----------------------
+    # -------------------------
     # Intent: book_description
-    # ----------------------
+    # -------------------------
     elif intent == "book_description":
         title = str(params.get("book_title", "")).lower()
         safe_title = re.escape(title)
-        match = books_df[books_df["title"].str.lower().str.contains(safe_title, na=False, regex=True)]
-        if not match.empty:
-            row = match.iloc[0]
+        match = books_df["title"].str.lower().str.contains(safe_title, na=False, regex=True)
+        if match.any():
+            row = books_df.loc[match].iloc[0]
             response_text = f"'{row['title']}' description: {row['description']}"
         else:
             response_text = f"Sorry, I couldn’t find a description for '{title}'."
 
-    # ------------------------
+    # ----------------------
     # Intent: published_date
-    # ------------------------
+    # ----------------------
     elif intent == "published_date":
         title = str(params.get("book_title", "")).lower()
         safe_title = re.escape(title)
-        match = books_df[books_df["title"].str.lower().str.contains(safe_title, na=False, regex=True)]
-        if not match.empty:
-            row = match.iloc[0]
+        match = books_df["title"].str.lower().str.contains(safe_title, na=False, regex=True)
+        if match.any():
+            row = books_df.loc[match].iloc[0]
             response_text = f"'{row['title']}' was published on {row['published_date']}."
         else:
             response_text = f"Sorry, I couldn’t find the published date for '{title}'."
@@ -268,9 +267,9 @@ Thumbnail: {row['thumbnail']}"""
     elif intent == "publisher":
         title = str(params.get("book_title", "")).lower()
         safe_title = re.escape(title)
-        match = books_df[books_df["title"].str.lower().str.contains(safe_title, na=False, regex=True)]
-        if not match.empty:
-            row = match.iloc[0]
+        match = books_df["title"].str.lower().str.contains(safe_title, na=False, regex=True)
+        if match.any():
+            row = books_df.loc[match].iloc[0]
             response_text = f"The publisher of '{row['title']}' is {row['publisher']}."
         else:
             response_text = f"Sorry, I couldn’t find the publisher for '{title}'."
@@ -281,9 +280,9 @@ Thumbnail: {row['thumbnail']}"""
     elif intent == "average_rating":
         title = str(params.get("book_title", "")).lower()
         safe_title = re.escape(title)
-        match = books_df[books_df["title"].str.lower().str.contains(safe_title, na=False, regex=True)]
-        if not match.empty:
-            row = match.iloc[0]
+        match = books_df["title"].str.lower().str.contains(safe_title, na=False, regex=True)
+        if match.any():
+            row = books_df.loc[match].iloc[0]
             response_text = f"'{row['title']}' has an average rating of {row['average_rating']}."
         else:
             response_text = f"Sorry, I couldn’t find ratings for '{title}'."
@@ -294,9 +293,9 @@ Thumbnail: {row['thumbnail']}"""
     elif intent == "thumbnail":
         title = str(params.get("book_title", "")).lower()
         safe_title = re.escape(title)
-        match = books_df[books_df["title"].str.lower().str.contains(safe_title, na=False, regex=True)]
-        if not match.empty:
-            row = match.iloc[0]
+        match = books_df["title"].str.lower().str.contains(safe_title, na=False, regex=True)
+        if match.any():
+            row = books_df.loc[match].iloc[0]
             response_text = f"Here is the cover of '{row['title']}': {row['thumbnail']}"
         else:
             response_text = f"Sorry, I couldn’t find a cover for '{title}'."
@@ -316,5 +315,3 @@ Thumbnail: {row['thumbnail']}"""
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
-
-
