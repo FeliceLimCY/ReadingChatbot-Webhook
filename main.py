@@ -7,75 +7,71 @@ import re
 app = Flask(__name__)
 
 # --------------------------
-# Excel Date Fix Function
-# --------------------------
-def excel_date_to_str(value: str) -> str:
-    """Convert Excel serial dates to dd/mm/yyyy, keep text formats as-is."""
-    try:
-        # Excel's base date = 1899-12-30
-        base_date = datetime(1899, 12, 30)
-        if value.isdigit():  # e.g., "41337"
-            days = int(value)
-            fixed_date = base_date + timedelta(days=days)
-            return fixed_date.strftime("%d/%m/%Y")
-        return value  # keep values like "2000-09", "2005"
-    except:
-        return value
-
-# --------------------------
 # Load dataset
 # --------------------------
-books_df = pd.read_excel("Books.xlsx", dtype=str).fillna("").astype(str)
+# Load all columns as strings to preserve Excel display
+books_df = pd.read_excel("Books.xlsx", dtype=str)
 
-# Fix published_date column
-if "published_date" in books_df.columns:
-    books_df["published_date"] = books_df["published_date"].apply(excel_date_to_str)
+# Convert Excel serial numbers in 'published_date' column to readable format
+def excel_date_to_str(date_str):
+    """
+    Convert Excel serial to dd/mm/yyyy if it's a serial number,
+    otherwise keep as-is (year or yyyy-mm).
+    """
+    if pd.isna(date_str):
+        return ""
+    try:
+        # Check if it's a float/int (Excel serial)
+        val = float(date_str)
+        # Excel serial 1 = 1900-01-01
+        from datetime import datetime, timedelta
+        dt = datetime(1899, 12, 30) + timedelta(days=int(val))
+        # Only convert if val > 59 (to skip Excel leap-year bug)
+        if val > 59:
+            return dt.strftime("%d/%m/%Y")
+    except:
+        pass
+    # Keep original string for year-only or yyyy-mm
+    return str(date_str)
 
-# --------------------------
+books_df["published_date"] = books_df["published_date"].apply(excel_date_to_str)
+
+# --------------
 # Translation
-# --------------------------
+# --------------
 def translate_to_english(text: str) -> str:
-    """Translate text to English."""
     try:
         return GoogleTranslator(source="auto", target="en").translate(text)
-    except Exception as e:
-        print(f"[ERROR] Translation to English failed: {e}")
+    except:
         return text
 
 def translate_back(text: str, target_lang: str) -> str:
-    """Translate English response back to original language."""
     try:
         if target_lang != "en":
             return GoogleTranslator(source="en", target=target_lang).translate(text)
         return text
-    except Exception as e:
-        print(f"[ERROR] Back translation failed: {e}")
+    except:
         return text
 
-# --------------------------
-# Safe language detection
-# --------------------------
 def safe_detect_language(text: str) -> str:
-    """Detect language, force English if only ASCII letters/punctuation are found."""
     try:
         lang = detect(text)
-        if lang != "en":
-            if re.fullmatch(r"[A-Za-z0-9\s\?\!\'\,\.\-]+", text):
-                print(f"[DEBUG] Overriding langdetect result ({lang}) -> en")
-                return "en"
+        # Override if only ASCII letters/punctuations
+        if re.fullmatch(r"[A-Za-z0-9\s\?\!\'\,\.\-]+", text):
+            return "en"
         return lang
     except:
         return "en"
 
 # --------------------------
-# Health check endpoint
+# Health check
 # --------------------------
 @app.route("/webhook", methods=["GET"])
 def verify_webhook():
     return "Webhook endpoint is live! Please use POST requests for Dialogflow.", 200
 
 # --------------------------
-# Main webhook endpoint
+# Main webhook
 # --------------------------
 @app.route("/webhook", methods=["POST"])
 def webhook():
@@ -84,9 +80,7 @@ def webhook():
     intent = req.get("queryResult", {}).get("intent", {}).get("displayName", "")
     params = req.get("queryResult", {}).get("parameters", {})
 
-    # Detect user language
     detected_lang = safe_detect_language(query_text)
-    # Translate to English
     translated_query = translate_to_english(query_text)
 
     print("\n[DEBUG] -------------------------")
@@ -285,7 +279,3 @@ Thumbnail: {row['thumbnail']}"""
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
-
-
-
-
