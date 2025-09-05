@@ -2,3 +2,5 @@ flask
 pandas
 openpyxl
 gunicorn
+pyspellchecker
+googletrans==4.0.0-rc1
