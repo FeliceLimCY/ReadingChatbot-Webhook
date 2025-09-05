@@ -6,37 +6,17 @@ import re
 
 app = Flask(__name__)
 
-# ----------------------
-# Helper: Clean dates
-# ----------------------
-def clean_date(value):
-    """Convert Excel serial or datetime to string, keep text unchanged."""
-    try:
-        if isinstance(value, (float, int)):  
-            # Convert Excel serial numbers to proper date
-            return pd.to_datetime(value, origin="1899-12-30", unit="D").strftime("%d/%m/%Y")
-        elif pd.api.types.is_datetime64_any_dtype(type(value)):  
-            # If it's already a datetime object
-            return pd.to_datetime(value).strftime("%d/%m/%Y")
-        else:
-            # Keep as string if already like '2005' or '2000-09'
-            return str(value)
-    except:
-        return str(value)
-
-# ----------------------
-# Load dataset
-# ----------------------
-books_df = pd.read_excel("Books.xlsx", dtype={"published_date": str})
-
-# Apply cleaning to published_date column
-if "published_date" in books_df.columns:
-    books_df["published_date"] = books_df["published_date"].apply(clean_date)
+# ----------------
+# Load dataset 
+# ----------------
+books_df = pd.read_excel("Books.xlsx", dtype=str)
+books_df = books_df.fillna("").astype(str)  # force all values to be strings
 
 # -------------
 # Translation
 # -------------
 def translate_to_english(text: str) -> str:
+    """Translate text to English."""
     try:
         return GoogleTranslator(source="auto", target="en").translate(text)
     except Exception as e:
@@ -44,6 +24,7 @@ def translate_to_english(text: str) -> str:
         return text
 
 def translate_back(text: str, target_lang: str) -> str:
+    """Translate English response back to original language."""
     try:
         if target_lang != "en":
             return GoogleTranslator(source="en", target=target_lang).translate(text)
@@ -56,6 +37,7 @@ def translate_back(text: str, target_lang: str) -> str:
 # Safe language detection
 # --------------------------
 def safe_detect_language(text: str) -> str:
+    """Detect language, force English if only ASCII letters/punctuation are found."""
     try:
         lang = detect(text)
         if lang != "en":
@@ -83,9 +65,13 @@ def webhook():
     intent = req.get("queryResult", {}).get("intent", {}).get("displayName", "")
     params = req.get("queryResult", {}).get("parameters", {})
 
+    # Detect user language
     detected_lang = safe_detect_language(query_text)
+
+    # Translate to English
     translated_query = translate_to_english(query_text)
 
+    # Debug log
     print("\n[DEBUG] -------------------------")
     print(f"Original query   : {query_text}")
     print(f"Translated query : {translated_query}")
@@ -153,14 +139,83 @@ Description: {row['description']}
 Thumbnail: {row['thumbnail']}"""
 
     # ----------------------
-    # Intent: published_date
+    # Intent: search_author
     # ----------------------
+    elif intent == "search_author":
+        author = str(params.get("author", "")).lower()
+        if author:
+            safe_author = re.escape(author)
+            match = books_df[books_df["author"].str.lower().str.contains(safe_author, na=False, regex=True)]
+            if not match.empty:
+                titles = "\n".join(match["title"].tolist()[:5])
+                response_text = f"Books by {author.title()}:\n{titles}"
+            else:
+                response_text = f"Sorry, I couldn’t find books from {author}."
+        else:
+            response_text = "Please provide an author name."
+
+    # ----------------------
+    # Intent: book_page
+    # ----------------------
+    elif intent == "book_page":
+        title = str(params.get("book_title", "")).lower()
+        safe_title = re.escape(title)
+        match = books_df[books_df["title"].str.lower().str.contains(safe_title, na=False, regex=True)]
+        if not match.empty:
+            row = match.iloc[0]
+            response_text = f"'{row['title']}' has {row['pages']} pages."
+        else:
+            response_text = f"Sorry, I couldn’t find page count for '{title}'."
+
+    # -------------------------
+    # Intent: search_by_genre
+    # -------------------------
+    elif intent == "search_by_genre":
+        genre = str(params.get("genre", "")).lower()
+        safe_genre = re.escape(genre)
+        match = books_df[books_df["genre"].str.lower().str.contains(safe_genre, na=False, regex=True)]
+        if not match.empty:
+            titles = "\n".join(match["title"].tolist()[:5])
+            response_text = f"Here are some {genre.title()} books:\n{titles}"
+        else:
+            response_text = f"Sorry, I couldn’t find books in the {genre} genre."
+
+    # -----------------------
+    # Intent: get_book_genre
+    # -----------------------
+    elif intent == "get_book_genre":
+        title = str(params.get("book_title", "")).lower()
+        safe_title = re.escape(title)
+        match = books_df[books_df["title"].str.lower().str.contains(safe_title, na=False, regex=True)]
+        if not match.empty:
+            row = match.iloc[0]
+            response_text = f"'{row['title']}' belongs to the {row['genre']} genre."
+        else:
+            response_text = f"Sorry, I couldn’t find genre for '{title}'."
+
+    # -------------------------
+    # Intent: book_description
+    # -------------------------
+    elif intent == "book_description":
+        title = str(params.get("book_title", "")).lower()
+        safe_title = re.escape(title)
+        match = books_df[books_df["title"].str.lower().str.contains(safe_title, na=False, regex=True)]
+        if not match.empty:
+            row = match.iloc[0]
+            response_text = f"'{row['title']}' description: {row['description']}"
+        else:
+            response_text = f"Sorry, I couldn’t find a description for '{title}'."
+
+    # ------------------------
+    # Intent: published_date
+    # ------------------------
     elif intent == "published_date":
         title = str(params.get("book_title", "")).lower()
         safe_title = re.escape(title)
         match = books_df[books_df["title"].str.lower().str.contains(safe_title, na=False, regex=True)]
         if not match.empty:
             row = match.iloc[0]
+            # Show published_date exactly as in dataset
             response_text = f"'{row['title']}' was published on {row['published_date']}."
         else:
             response_text = f"Sorry, I couldn’t find the published date for '{title}'."
@@ -212,11 +267,10 @@ Thumbnail: {row['thumbnail']}"""
 
     # Translate back to user's language
     response_text = translate_back(response_text, detected_lang)
-    
+
     print(f"[DEBUG] Final response (before sending): {response_text}\n")
 
     return jsonify({"fulfillmentText": response_text})
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
-
