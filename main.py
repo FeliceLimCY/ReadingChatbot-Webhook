@@ -86,12 +86,12 @@ def webhook():
             match = books_df[books_df["title"].str.lower().str.contains(title, na=False)]
             if not match.empty:
                 row = match.iloc[0]
-                response_text = f"""📖 I found a book for you!            
+                response_text = f"""I found a book 📖 for you!            
 Title: {row['title']}
 Author: {row['author']}
 Genre: {row['genre']}
 Publisher: {row['publisher']}
-Publish Date: {row['publish_date']}
+Published Date: {row['published_date']}
 Pages: {row['pages']}
 Average Rating: {row['average_rating']}
 Description: {row['description']}
@@ -102,13 +102,24 @@ Thumbnail: {row['thumbnail']}"""
 How about this one instead?
 Title: {row['title']}
 Author: {row['author']}
-Genre: {row['genre']}"""
+Publisher: {row['publisher']}
+Published Date: {row['published_date']}
+Pages: {row['pages']}
+Average Rating: {row['average_rating']}
+Description: {row['description']}
+Thumbnail: {row['thumbnail']}"""  
         else:                
             row = books_df.sample(1).iloc[0]
             response_text = f"""I recommend this book for you:
 Title: {row['title']}
 Author: {row['author']}
-Genre: {row['genre']}"""
+Genre: {row['genre']}
+Publisher: {row['publisher']}
+Published Date: {row['published_date']}
+Pages: {row['pages']}
+Average Rating: {row['average_rating']}
+Description: {row['description']}
+Thumbnail: {row['thumbnail']}"""
 
     # ----------------------
     # Intent: search_author
@@ -173,17 +184,17 @@ Genre: {row['genre']}"""
         else:
             response_text = f"Sorry, I couldn’t find a description for '{title}'."
 
-    # ----------------------
-    # Intent: publish_date
-    # ----------------------
-    elif intent == "publish_date":
+    # ------------------------
+    # Intent: published_date
+    # ------------------------
+    elif intent == "published_date":
         title = str(params.get("book_title", "")).lower()
         match = books_df[books_df["title"].str.lower().str.contains(title, na=False)]
         if not match.empty:
             row = match.iloc[0]
-            response_text = f"'{row['title']}' was published on {row['publish_date']}."
+            response_text = f"'{row['title']}' was published on {row['published_date']}."
         else:
-            response_text = f"Sorry, I couldn’t find the publish date for '{title}'."
+            response_text = f"Sorry, I couldn’t find the published date for '{title}'."
 
     # ----------------------
     # Intent: publisher
@@ -237,3 +248,4 @@ Genre: {row['genre']}"""
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
+
