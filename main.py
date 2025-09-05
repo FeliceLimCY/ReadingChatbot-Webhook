@@ -1,24 +1,23 @@
 from flask import Flask, request, jsonify
 import pandas as pd
 from deep_translator import GoogleTranslator
+from langdetect import detect
 
 app = Flask(__name__)
 
 # Load dataset
 books_df = pd.read_excel("Books.xlsx")
 
-# --------------------------
+# -------------
 # Translation
-# --------------------------
-def translate_to_english(text: str) -> (str, str):
-    """Translate text to English and detect language."""
+# -------------
+def translate_to_english(text: str) -> str:
+    """Translate text to English."""
     try:
-        translated = GoogleTranslator(source="auto", target="en").translate(text)
-        detected_lang = GoogleTranslator(source="auto", target="en").source
-        return translated, detected_lang
+        return GoogleTranslator(source="auto", target="en").translate(text)
     except Exception as e:
         print(f"[ERROR] Translation to English failed: {e}")
-        return text, "en"
+        return text
 
 def translate_back(text: str, target_lang: str) -> str:
     """Translate English response back to original language."""
@@ -47,10 +46,16 @@ def webhook():
     intent = req.get("queryResult", {}).get("intent", {}).get("displayName", "")
     params = req.get("queryResult", {}).get("parameters", {})
 
-    #Translate to English
-    translated_query, detected_lang = translate_to_english(corrected_query)
+    # Detect user language
+    try:
+        detected_lang = detect(query_text)
+    except:
+        detected_lang = "en"
 
-    #Debug log
+    # Translate to English
+    translated_query = translate_to_english(query_text)
+
+    # Debug log
     print("\n[DEBUG] -------------------------")
     print(f"Original query   : {query_text}")
     print(f"Translated query : {translated_query}")
@@ -81,20 +86,29 @@ def webhook():
             match = books_df[books_df["title"].str.lower().str.contains(title, na=False)]
             if not match.empty:
                 row = match.iloc[0]
-                response_text = f"""I found '{row['title']}' by Author: {row['author']} 
-                Genre: {row['genre']}
-                Publisher: {row['publisher']}
-                Publish Date: {row['publish_date']}
-                Pages: {row['pages']}
-                Average Rating: {row['average_rating']}
-                Description:{row['description']}
-                Thumbnail: {row['thumbnail']}"""
+                response_text = f"""📖 I found a book for you!            
+Title: {row['title']}
+Author: {row['author']}
+Genre: {row['genre']}
+Publisher: {row['publisher']}
+Publish Date: {row['publish_date']}
+Pages: {row['pages']}
+Average Rating: {row['average_rating']}
+Description: {row['description']}
+Thumbnail: {row['thumbnail']}"""            
             else:
                 row = books_df.sample(1).iloc[0]
-                response_text = f"Sorry, I couldn’t find a book titled '{title}'. How about '{row['title']}' by {row['author']}?"
-        else:
+                response_text = f"""Sorry, I couldn’t find a book titled '{title}'. 
+How about this one instead?
+Title: {row['title']}
+Author: {row['author']}
+Genre: {row['genre']}"""
+        else:                
             row = books_df.sample(1).iloc[0]
-            response_text = f"I recommend '{row['title']}' by {row['author']} (Genre: {row['genre']})."
+            response_text = f"""I recommend this book for you:
+Title: {row['title']}
+Author: {row['author']}
+Genre: {row['genre']}"""
 
     # ----------------------
     # Intent: search_author
@@ -184,9 +198,9 @@ def webhook():
             response_text = f"Sorry, I couldn’t find the publisher for '{title}'."
 
     # ----------------------
-    # Intent: averate_rating
+    # Intent: average_rating
     # ----------------------
-    elif intent == "averate_rating":
+    elif intent == "average_rating":
         title = str(params.get("book_title", "")).lower()
         match = books_df[books_df["title"].str.lower().str.contains(title, na=False)]
         if not match.empty:
@@ -213,7 +227,7 @@ def webhook():
     elif intent == "bot_challenge":
         response_text = "I’m a book assistant bot 🤖, here to help you discover books!"
 
-    #Translate back to user’s language
+    # Translate back to user's language
     response_text = translate_back(response_text, detected_lang)
 
     print(f"[DEBUG] Final response (before sending): {response_text}\n")
@@ -223,5 +237,3 @@ def webhook():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
-
-
