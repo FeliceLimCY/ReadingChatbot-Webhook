@@ -166,15 +166,57 @@ Thumbnail: {row['thumbnail']}"""
             response_text = f"Sorry, I couldn’t find the published date for '{title}'."
 
     # ----------------------
-    # Intent: other handlers (author, genre, etc.)
+    # Intent: publisher
     # ----------------------
-    # ... keep your other intents (search_author, search_by_genre, etc.) unchanged ...
+    elif intent == "publisher":
+        title = str(params.get("book_title", "")).lower()
+        safe_title = re.escape(title)
+        match = books_df[books_df["title"].str.lower().str.contains(safe_title, na=False, regex=True)]
+        if not match.empty:
+            row = match.iloc[0]
+            response_text = f"The publisher of '{row['title']}' is {row['publisher']}."
+        else:
+            response_text = f"Sorry, I couldn’t find the publisher for '{title}'."
 
+    # ----------------------
+    # Intent: average_rating
+    # ----------------------
+    elif intent == "average_rating":
+        title = str(params.get("book_title", "")).lower()
+        safe_title = re.escape(title)
+        match = books_df[books_df["title"].str.lower().str.contains(safe_title, na=False, regex=True)]
+        if not match.empty:
+            row = match.iloc[0]
+            response_text = f"'{row['title']}' has an average rating of {row['average_rating']}."
+        else:
+            response_text = f"Sorry, I couldn’t find ratings for '{title}'."
+
+    # ----------------------
+    # Intent: thumbnail
+    # ----------------------
+    elif intent == "thumbnail":
+        title = str(params.get("book_title", "")).lower()
+        safe_title = re.escape(title)
+        match = books_df[books_df["title"].str.lower().str.contains(safe_title, na=False, regex=True)]
+        if not match.empty:
+            row = match.iloc[0]
+            response_text = f"Here is the cover of '{row['title']}': {row['thumbnail']}"
+        else:
+            response_text = f"Sorry, I couldn’t find a cover for '{title}'."
+
+    # ----------------------
+    # Intent: bot_challenge
+    # ----------------------
+    elif intent == "bot_challenge":
+        response_text = "I’m a book assistant bot 🤖, here to help you discover books!"
+
+    # Translate back to user's language
     response_text = translate_back(response_text, detected_lang)
-
+    
     print(f"[DEBUG] Final response (before sending): {response_text}\n")
 
     return jsonify({"fulfillmentText": response_text})
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
+
