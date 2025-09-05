@@ -2,6 +2,7 @@ from flask import Flask, request, jsonify
 import pandas as pd
 from deep_translator import GoogleTranslator
 from langdetect import detect
+import re
 
 app = Flask(__name__)
 
@@ -9,12 +10,12 @@ app = Flask(__name__)
 books_df = pd.read_excel("Books.xlsx")
 
 # -------------
-# Translation 
+# Translation
 # -------------
-def translate_to_english(text: str, source_lang: str) -> str:
-    """Translate text to English using langdetect result as source."""
+def translate_to_english(text: str) -> str:
+    """Translate text to English."""
     try:
-        return GoogleTranslator(source=source_lang, target="en").translate(text)
+        return GoogleTranslator(source="auto", target="en").translate(text)
     except Exception as e:
         print(f"[ERROR] Translation to English failed: {e}")
         return text
@@ -28,6 +29,22 @@ def translate_back(text: str, target_lang: str) -> str:
     except Exception as e:
         print(f"[ERROR] Back translation failed: {e}")
         return text
+
+# --------------------------
+# Language detection (safe)
+# --------------------------
+def safe_detect_language(text: str) -> str:
+    """Detect language, but force English if only ASCII/basic words are found."""
+    try:
+        lang = detect(text)
+        if lang != "en":
+            # If text is only ASCII letters, numbers, spaces, and basic punctuation → assume English
+            if re.fullmatch(r"[A-Za-z0-9\s\?\!\'\,\.]+", text):
+                print(f"[DEBUG] Overriding langdetect result ({lang}) -> en")
+                return "en"
+        return lang
+    except:
+        return "en"
 
 # --------------------------
 # Health check endpoint
@@ -46,16 +63,13 @@ def webhook():
     intent = req.get("queryResult", {}).get("intent", {}).get("displayName", "")
     params = req.get("queryResult", {}).get("parameters", {})
 
-    # Detect language with langdetect (fallback to English if fails)
-    try:
-        detected_lang = detect(query_text)
-    except:
-        detected_lang = "en"
+    # Detect user language
+    detected_lang = safe_detect_language(query_text)
 
-    # Translate query into English (using langdetect result, not auto)
-    translated_query = translate_to_english(query_text, detected_lang)
+    # Translate to English
+    translated_query = translate_to_english(query_text)
 
-    # Debug logs
+    # Debug log
     print("\n[DEBUG] -------------------------")
     print(f"Original query   : {query_text}")
     print(f"Translated query : {translated_query}")
@@ -86,7 +100,7 @@ def webhook():
             match = books_df[books_df["title"].str.lower().str.contains(title, na=False)]
             if not match.empty:
                 row = match.iloc[0]
-                response_text = f"""I found a book 📖 for you!
+                response_text = f"""I found a book 📖 for you!            
 Title: {row['title']}
 Author: {row['author']}
 Genre: {row['genre']}
@@ -95,10 +109,10 @@ Published Date: {row['published_date']}
 Pages: {row['pages']}
 Average Rating: {row['average_rating']}
 Description: {row['description']}
-Thumbnail: {row['thumbnail']}"""
+Thumbnail: {row['thumbnail']}"""            
             else:
                 row = books_df.sample(1).iloc[0]
-                response_text = f"""Sorry, I couldn’t find a book titled '{title}'.
+                response_text = f"""Sorry, I couldn’t find a book titled '{title}'. 
 How about this one instead?
 Title: {row['title']}
 Author: {row['author']}
@@ -107,8 +121,8 @@ Published Date: {row['published_date']}
 Pages: {row['pages']}
 Average Rating: {row['average_rating']}
 Description: {row['description']}
-Thumbnail: {row['thumbnail']}"""
-        else:
+Thumbnail: {row['thumbnail']}"""  
+        else:                
             row = books_df.sample(1).iloc[0]
             response_text = f"""I recommend this book for you:
 Title: {row['title']}
@@ -129,8 +143,8 @@ Thumbnail: {row['thumbnail']}"""
         if author:
             match = books_df[books_df["author"].str.lower().str.contains(author, na=False)]
             if not match.empty:
-                titles = ", ".join(match["title"].tolist()[:5])
-                response_text = f"Books by {author.title()}: {titles}"
+                titles = "\n".join(match["title"].tolist()[:5])
+                response_text = f"Books by {author.title()}:\n{titles}"
             else:
                 response_text = f"Sorry, I couldn’t find books from {author}."
         else:
@@ -155,8 +169,8 @@ Thumbnail: {row['thumbnail']}"""
         genre = str(params.get("genre", "")).lower()
         match = books_df[books_df["genre"].str.lower().str.contains(genre, na=False)]
         if not match.empty:
-            titles = ", ".join(match["title"].tolist()[:5])
-            response_text = f"Here are some {genre.title()} books: {titles}"
+            titles = "\n".join(match["title"].tolist()[:5])  # each on new line
+            response_text = f"Here are some {genre.title()} books:\n{titles}"
         else:
             response_text = f"Sorry, I couldn’t find books in the {genre} genre."
 
