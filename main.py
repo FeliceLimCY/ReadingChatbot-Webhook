@@ -1,22 +1,84 @@
 from flask import Flask, request, jsonify
 import pandas as pd
+from spellchecker import SpellChecker
+from googletrans import Translator
+import logging
 
 app = Flask(__name__)
 
-# Load your dataset (Books.xlsx must be uploaded to Render along with this file)
+# --------------------------
+# Setup logging
+# --------------------------
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+)
+
+# Load dataset
 books_df = pd.read_excel("Books.xlsx")
 
-#Health check endpoint for browser and verification
+# Initialize spell checker and translator
+spell = SpellChecker()
+translator = Translator()
+
+# --------------------------
+# Utility functions
+# --------------------------
+def correct_spelling(text: str) -> str:
+    """Correct spelling mistakes in user input."""
+    words = text.split()
+    corrected_words = [spell.correction(w) or w for w in words]
+    corrected = " ".join(corrected_words)
+    if corrected != text:
+        logging.info(f"Spelling corrected: '{text}' → '{corrected}'")
+    return corrected
+
+def translate_to_english(text: str) -> (str, str):
+    """Detect language and translate to English if needed."""
+    detected = translator.detect(text)
+    lang = detected.lang
+    if lang != "en":
+        translated = translator.translate(text, dest="en").text
+        logging.info(f"Translated to English: '{text}' ({lang}) → '{translated}'")
+        return translated, lang
+    logging.info(f"No translation needed (English detected): '{text}'")
+    return text, "en"
+
+def translate_back(text: str, target_lang: str) -> str:
+    """Translate English response back to original language."""
+    if target_lang != "en":
+        translated = translator.translate(text, dest=target_lang).text
+        logging.info(f"Translated back to {target_lang}: '{text}' → '{translated}'")
+        return translated
+    return text
+
+# --------------------------
+# Health check endpoint
+# --------------------------
 @app.route("/webhook", methods=["GET"])
 def verify_webhook():
     return "Webhook endpoint is live! Please use POST requests for Dialogflow.", 200
 
-#Main webhook endpoint that now MATCHES Dialogflow settings
+# --------------------------
+# Main webhook endpoint
+# --------------------------
 @app.route("/webhook", methods=["POST"])
 def webhook():
     req = request.get_json(force=True)
+    query_text = req.get("queryResult", {}).get("queryText", "")
     intent = req.get("queryResult", {}).get("intent", {}).get("displayName", "")
     params = req.get("queryResult", {}).get("parameters", {})
+
+    logging.info(f"Incoming request → Intent: {intent}, Query: '{query_text}'")
+
+    # ✅ Step 1: Fix spelling
+    corrected_query = correct_spelling(query_text)
+
+    # ✅ Step 2: Translate to English (Dialogflow works best in English)
+    translated_query, detected_lang = translate_to_english(corrected_query)
+
+    # Replace Dialogflow query with cleaned version
+    req["queryResult"]["queryText"] = translated_query
 
     response_text = "Sorry, I didn’t get that."
 
@@ -38,17 +100,14 @@ def webhook():
     elif intent == "search_book":
         title = str(params.get("book_title", "")).lower()
         if title:
-            #Search for specific books
             match = books_df[books_df["title"].str.lower().str.contains(title, na=False)]
             if not match.empty:
                 row = match.iloc[0]
                 response_text = f"I found '{row['title']}' by {row['author']} (Genre: {row['genre']})."
             else:
-                #If book not found, recommend random book
                 row = books_df.sample(1).iloc[0]
                 response_text = f"Sorry, I couldn’t find a book titled '{title}'. How about '{row['title']}' by {row['author']}?"
         else:
-            #No title provided = recommend random book
             row = books_df.sample(1).iloc[0]
             response_text = f"I recommend '{row['title']}' by {row['author']} (Genre: {row['genre']})."
 
@@ -164,16 +223,15 @@ def webhook():
             response_text = f"Sorry, I couldn’t find a cover for '{title}'."
 
     # ----------------------
-    # Intent: feedback
-    # ----------------------
-    elif intent == "feedback":
-        response_text = "Thanks for your feedback! Your opinion helps me recommend better books."
-
-    # ----------------------
     # Intent: bot_challenge
     # ----------------------
     elif intent == "bot_challenge":
         response_text = "I’m a book assistant bot 🤖, here to help you discover books!"
+
+    # ✅ Step 3: Translate back to user’s language
+    response_text = translate_back(response_text, detected_lang)
+
+    logging.info(f"Final response (to user in {detected_lang}): {response_text}")
 
     return jsonify({"fulfillmentText": response_text})
 
