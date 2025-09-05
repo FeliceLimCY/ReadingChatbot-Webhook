@@ -3,14 +3,34 @@ import pandas as pd
 from deep_translator import GoogleTranslator
 from langdetect import detect
 import re
+from datetime import datetime, timedelta
 
 app = Flask(__name__)
 
-# ----------------
-# Load dataset 
-# ----------------
-books_df = pd.read_excel("Books.xlsx", dtype=str)
-books_df = books_df.fillna("").astype(str)  # force all values to be strings
+# --------------------------
+# Excel Date Fix Function
+# --------------------------
+def excel_date_to_str(value: str) -> str:
+    """Convert Excel serial dates to dd/mm/yyyy, keep text formats as-is."""
+    try:
+        # Excel's base date = 1899-12-30
+        base_date = datetime(1899, 12, 30)
+        if value.isdigit():  # eg "41337"
+            days = int(value)
+            fixed_date = base_date + timedelta(days=days)
+            return fixed_date.strftime("%d/%m/%Y")
+        return value  # keep values like "2000-09", "2005"
+    except:
+        return value
+
+# --------------------------
+# Load dataset
+# --------------------------
+books_df = pd.read_excel("Books.xlsx", dtype=str).fillna("").astype(str)
+
+# Fix published_date column
+if "published_date" in books_df.columns:
+    books_df["published_date"] = books_df["published_date"].apply(excel_date_to_str)
 
 # -------------
 # Translation
@@ -167,9 +187,9 @@ Thumbnail: {row['thumbnail']}"""
         else:
             response_text = f"Sorry, I couldn’t find page count for '{title}'."
 
-    # -------------------------
+    # ----------------------
     # Intent: search_by_genre
-    # -------------------------
+    # ----------------------
     elif intent == "search_by_genre":
         genre = str(params.get("genre", "")).lower()
         safe_genre = re.escape(genre)
@@ -180,9 +200,9 @@ Thumbnail: {row['thumbnail']}"""
         else:
             response_text = f"Sorry, I couldn’t find books in the {genre} genre."
 
-    # -----------------------
+    # ----------------------
     # Intent: get_book_genre
-    # -----------------------
+    # ----------------------
     elif intent == "get_book_genre":
         title = str(params.get("book_title", "")).lower()
         safe_title = re.escape(title)
@@ -193,9 +213,9 @@ Thumbnail: {row['thumbnail']}"""
         else:
             response_text = f"Sorry, I couldn’t find genre for '{title}'."
 
-    # -------------------------
+    # ----------------------
     # Intent: book_description
-    # -------------------------
+    # ----------------------
     elif intent == "book_description":
         title = str(params.get("book_title", "")).lower()
         safe_title = re.escape(title)
@@ -215,7 +235,6 @@ Thumbnail: {row['thumbnail']}"""
         match = books_df[books_df["title"].str.lower().str.contains(safe_title, na=False, regex=True)]
         if not match.empty:
             row = match.iloc[0]
-            # Show published_date exactly as in dataset
             response_text = f"'{row['title']}' was published on {row['published_date']}."
         else:
             response_text = f"Sorry, I couldn’t find the published date for '{title}'."
