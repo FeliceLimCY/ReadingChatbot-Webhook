@@ -31,14 +31,13 @@ def translate_back(text: str, target_lang: str) -> str:
         return text
 
 # --------------------------
-# Language detection (safe)
+# Safe language detection
 # --------------------------
 def safe_detect_language(text: str) -> str:
-    """Detect language, but force English if only ASCII/basic words are found."""
+    """Detect language, force English if only ASCII letters/punctuation are found."""
     try:
         lang = detect(text)
         if lang != "en":
-            # If text is only ASCII letters, numbers, spaces, and basic punctuation → assume English
             if re.fullmatch(r"[A-Za-z0-9\s\?\!\'\,\.]+", text):
                 print(f"[DEBUG] Overriding langdetect result ({lang}) -> en")
                 return "en"
@@ -89,7 +88,7 @@ def webhook():
     # Intent: goodbye
     # ----------------------
     elif intent == "goodbye":
-        response_text = "Goodbye! Happy reading 📚"
+        response_text = "Goodbye! Happy reading 📖"
 
     # ----------------------
     # Intent: search_book
@@ -97,10 +96,11 @@ def webhook():
     elif intent == "search_book":
         title = str(params.get("book_title", "")).lower()
         if title:
-            match = books_df[books_df["title"].str.lower().str.contains(title, na=False)]
+            safe_title = re.escape(title)
+            match = books_df[books_df["title"].str.lower().str.contains(safe_title, na=False, regex=True)]
             if not match.empty:
                 row = match.iloc[0]
-                response_text = f"""I found a book 📖 for you!            
+                response_text = f"""I found a book 📕 for you!            
 Title: {row['title']}
 Author: {row['author']}
 Genre: {row['genre']}
@@ -141,7 +141,8 @@ Thumbnail: {row['thumbnail']}"""
     elif intent == "search_author":
         author = str(params.get("author", "")).lower()
         if author:
-            match = books_df[books_df["author"].str.lower().str.contains(author, na=False)]
+            safe_author = re.escape(author)
+            match = books_df[books_df["author"].str.lower().str.contains(safe_author, na=False, regex=True)]
             if not match.empty:
                 titles = "\n".join(match["title"].tolist()[:5])
                 response_text = f"Books by {author.title()}:\n{titles}"
@@ -155,7 +156,8 @@ Thumbnail: {row['thumbnail']}"""
     # ----------------------
     elif intent == "book_page":
         title = str(params.get("book_title", "")).lower()
-        match = books_df[books_df["title"].str.lower().str.contains(title, na=False)]
+        safe_title = re.escape(title)
+        match = books_df[books_df["title"].str.lower().str.contains(safe_title, na=False, regex=True)]
         if not match.empty:
             row = match.iloc[0]
             response_text = f"'{row['title']}' has {row['pages']} pages."
@@ -167,9 +169,10 @@ Thumbnail: {row['thumbnail']}"""
     # ----------------------
     elif intent == "search_by_genre":
         genre = str(params.get("genre", "")).lower()
-        match = books_df[books_df["genre"].str.lower().str.contains(genre, na=False)]
+        safe_genre = re.escape(genre)
+        match = books_df[books_df["genre"].str.lower().str.contains(safe_genre, na=False, regex=True)]
         if not match.empty:
-            titles = "\n".join(match["title"].tolist()[:5])  # each on new line
+            titles = "\n".join(match["title"].tolist()[:5])
             response_text = f"Here are some {genre.title()} books:\n{titles}"
         else:
             response_text = f"Sorry, I couldn’t find books in the {genre} genre."
@@ -179,7 +182,8 @@ Thumbnail: {row['thumbnail']}"""
     # ----------------------
     elif intent == "get_book_genre":
         title = str(params.get("book_title", "")).lower()
-        match = books_df[books_df["title"].str.lower().str.contains(title, na=False)]
+        safe_title = re.escape(title)
+        match = books_df[books_df["title"].str.lower().str.contains(safe_title, na=False, regex=True)]
         if not match.empty:
             row = match.iloc[0]
             response_text = f"'{row['title']}' belongs to the {row['genre']} genre."
@@ -191,7 +195,8 @@ Thumbnail: {row['thumbnail']}"""
     # ----------------------
     elif intent == "book_description":
         title = str(params.get("book_title", "")).lower()
-        match = books_df[books_df["title"].str.lower().str.contains(title, na=False)]
+        safe_title = re.escape(title)
+        match = books_df[books_df["title"].str.lower().str.contains(safe_title, na=False, regex=True)]
         if not match.empty:
             row = match.iloc[0]
             response_text = f"'{row['title']}' description: {row['description']}"
@@ -203,7 +208,8 @@ Thumbnail: {row['thumbnail']}"""
     # ------------------------
     elif intent == "published_date":
         title = str(params.get("book_title", "")).lower()
-        match = books_df[books_df["title"].str.lower().str.contains(title, na=False)]
+        safe_title = re.escape(title)
+        match = books_df[books_df["title"].str.lower().str.contains(safe_title, na=False, regex=True)]
         if not match.empty:
             row = match.iloc[0]
             response_text = f"'{row['title']}' was published on {row['published_date']}."
@@ -215,7 +221,8 @@ Thumbnail: {row['thumbnail']}"""
     # ----------------------
     elif intent == "publisher":
         title = str(params.get("book_title", "")).lower()
-        match = books_df[books_df["title"].str.lower().str.contains(title, na=False)]
+        safe_title = re.escape(title)
+        match = books_df[books_df["title"].str.lower().str.contains(safe_title, na=False, regex=True)]
         if not match.empty:
             row = match.iloc[0]
             response_text = f"The publisher of '{row['title']}' is {row['publisher']}."
@@ -227,7 +234,8 @@ Thumbnail: {row['thumbnail']}"""
     # ----------------------
     elif intent == "average_rating":
         title = str(params.get("book_title", "")).lower()
-        match = books_df[books_df["title"].str.lower().str.contains(title, na=False)]
+        safe_title = re.escape(title)
+        match = books_df[books_df["title"].str.lower().str.contains(safe_title, na=False, regex=True)]
         if not match.empty:
             row = match.iloc[0]
             response_text = f"'{row['title']}' has an average rating of {row['average_rating']}."
@@ -239,7 +247,8 @@ Thumbnail: {row['thumbnail']}"""
     # ----------------------
     elif intent == "thumbnail":
         title = str(params.get("book_title", "")).lower()
-        match = books_df[books_df["title"].str.lower().str.contains(title, na=False)]
+        safe_title = re.escape(title)
+        match = books_df[books_df["title"].str.lower().str.contains(safe_title, na=False, regex=True)]
         if not match.empty:
             row = match.iloc[0]
             response_text = f"Here is the cover of '{row['title']}': {row['thumbnail']}"
@@ -258,7 +267,6 @@ Thumbnail: {row['thumbnail']}"""
     print(f"[DEBUG] Final response (before sending): {response_text}\n")
 
     return jsonify({"fulfillmentText": response_text})
-
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
