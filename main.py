@@ -13,16 +13,21 @@ app = Flask(__name__)
 def excel_date_to_str(value: str) -> str:
     """Convert Excel serial dates to dd/mm/yyyy, keep text formats as-is."""
     try:
-        # Excel's base date = 1899-12-30
-        base_date = datetime(1899, 12, 30)
-        if value.isdigit():  # eg "41337"
-            days = int(value)
-            fixed_date = base_date + timedelta(days=days)
-            return fixed_date.strftime("%d/%m/%Y")
-        return value  # keep values like "2000-09", "2005"
+        # If it's just digits
+        if value.isdigit():
+            num = int(value)
+            # Treat small numbers as Excel serial dates (usually < 60000 ~ year 2064)
+            if 30 < num < 60000:  
+                base_date = datetime(1899, 12, 30)
+                fixed_date = base_date + timedelta(days=num)
+                return fixed_date.strftime("%d/%m/%Y")
+            else:
+                # It's probably just a year like "1990"
+                return value
+        return value  # keep values like "2000-09", "2005", "04/03/2013"
     except:
         return value
-
+        
 # --------------------------
 # Load dataset
 # --------------------------
@@ -293,3 +298,4 @@ Thumbnail: {row['thumbnail']}"""
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
+
