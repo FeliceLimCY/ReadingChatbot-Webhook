@@ -102,7 +102,7 @@ def webhook():
     response_text = "Sorry, I didn’t get that."
 
     # ----------------------
-    # Intent handling
+    # Safe search helper
     # ----------------------
     def safe_search(column, value):
         return books_df[books_df[column].str.lower().str.contains(re.escape(value.lower()), na=False, regex=True)]
@@ -113,10 +113,16 @@ def webhook():
     if intent == "greet":
         response_text = "Hello! How can I help you with books today?"
 
+    # ----------------------
+    # Intent: goodbye
+    # ----------------------
     elif intent == "goodbye":
         response_text = "Goodbye! Happy reading 📖"
 
-    elif intent == "search_book":
+    # -----------------------------
+    # Intent: search_book_by_title
+    # -----------------------------
+    elif intent == "search_book_by_title":
         title = str(params.get("book_title", ""))
         if title:
             match = safe_search("title", title)
@@ -157,7 +163,10 @@ Average Rating: {row['average_rating']}
 Description: {row['description']}
 Thumbnail: {row['thumbnail']}"""
 
-    elif intent == "search_author":
+    # ------------------------------
+    # Intent: search_book_by_author
+    # ------------------------------
+    elif intent == "search_book_by_author":
         author = str(params.get("author", ""))
         if author:
             match = safe_search("author", author)
@@ -169,7 +178,10 @@ Thumbnail: {row['thumbnail']}"""
         else:
             response_text = "Please provide an author name."
 
-    elif intent == "book_page":
+    # ------------------------------
+    # Intent: ask_number_of_pages
+    # ------------------------------
+    elif intent == "ask_number_of_pages":
         title = str(params.get("book_title", ""))
         match = safe_search("title", title)
         if not match.empty:
@@ -178,7 +190,10 @@ Thumbnail: {row['thumbnail']}"""
         else:
             response_text = f"Sorry, I couldn’t find page count for '{title}'."
 
-    elif intent == "search_by_genre":
+    # ------------------------------
+    # Intent: search_book_by_genre
+    # ------------------------------
+    elif intent == "search_book_by_genre":
         genre = str(params.get("genre", ""))
         match = safe_search("genre", genre)
         if not match.empty:
@@ -187,16 +202,10 @@ Thumbnail: {row['thumbnail']}"""
         else:
             response_text = f"Sorry, I couldn’t find books in the {genre} genre."
 
-    elif intent == "get_book_genre":
-        title = str(params.get("book_title", ""))
-        match = safe_search("title", title)
-        if not match.empty:
-            row = match.iloc[0]
-            response_text = f"'{row['title']}' belongs to the {row['genre']} genre."
-        else:
-            response_text = f"Sorry, I couldn’t find genre for '{title}'."
-
-    elif intent == "book_description":
+    # ------------------------------
+    # Intent: ask_book_description
+    # ------------------------------
+    elif intent == "ask_book_description":
         title = str(params.get("book_title", ""))
         match = safe_search("title", title)
         if not match.empty:
@@ -205,7 +214,10 @@ Thumbnail: {row['thumbnail']}"""
         else:
             response_text = f"Sorry, I couldn’t find a description for '{title}'."
 
-    elif intent == "published_date":
+    # ------------------------------
+    # Intent: ask_publish_date
+    # ------------------------------
+    elif intent == "ask_publish_date":
         title = str(params.get("book_title", ""))
         match = safe_search("title", title)
         if not match.empty:
@@ -214,7 +226,10 @@ Thumbnail: {row['thumbnail']}"""
         else:
             response_text = f"Sorry, I couldn’t find the published date for '{title}'."
 
-    elif intent == "publisher":
+    # ------------------------------
+    # Intent: ask_publisher
+    # ------------------------------
+    elif intent == "ask_publisher":
         title = str(params.get("book_title", ""))
         match = safe_search("title", title)
         if not match.empty:
@@ -223,7 +238,10 @@ Thumbnail: {row['thumbnail']}"""
         else:
             response_text = f"Sorry, I couldn’t find the publisher for '{title}'."
 
-    elif intent == "average_rating":
+    # ------------------------------
+    # Intent: ask_average_rating
+    # ------------------------------
+    elif intent == "ask_average_rating":
         title = str(params.get("book_title", ""))
         match = safe_search("title", title)
         if not match.empty:
@@ -232,7 +250,10 @@ Thumbnail: {row['thumbnail']}"""
         else:
             response_text = f"Sorry, I couldn’t find ratings for '{title}'."
 
-    elif intent == "thumbnail":
+    # ------------------------------
+    # Intent: ask_thumbnail
+    # ------------------------------
+    elif intent == "ask_thumbnail":
         title = str(params.get("book_title", ""))
         match = safe_search("title", title)
         if not match.empty:
@@ -241,10 +262,33 @@ Thumbnail: {row['thumbnail']}"""
         else:
             response_text = f"Sorry, I couldn’t find a cover for '{title}'."
 
+    # ------------------------------
+    # Intent: bot_challenge
+    # ------------------------------
     elif intent == "bot_challenge":
         response_text = "I’m a book assistant bot 🤖, here to help you discover books!"
 
+    # ------------------------------
+    # Intent: search_top_rated
+    # ------------------------------
+    elif intent == "search_top_rated":
+        if books_df.empty:
+            response_text = "❌ I cannot provide top-rated books. The dataset is empty."
+        else:
+            try:
+                # Ensure numeric sorting (convert ratings if needed)
+                books_df["average_rating"] = pd.to_numeric(books_df["average_rating"], errors="coerce")
+                top_books = books_df.sort_values(by="average_rating", ascending=False).head(5)
+                msg = "🏆 Top Rated Books:\n"
+                for _, row in top_books.iterrows():
+                    msg += f"- {row['title']} by {row['author']} (⭐ {row['average_rating']})\n"
+                response_text = msg.strip()
+            except Exception as e:
+                response_text = f"❌ Error fetching top rated books: {str(e)}"
+
+    # ------------------------------
     # Translate back to user's language
+    # ------------------------------
     response_text = translate_back(response_text, detected_lang)
     print(f"[DEBUG] Final response (before sending): {response_text}\n")
 
