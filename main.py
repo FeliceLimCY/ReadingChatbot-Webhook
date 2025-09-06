@@ -268,7 +268,7 @@ Thumbnail: {row['thumbnail']}"""
     elif intent == "bot_challenge":
         response_text = "I’m a book assistant bot 🤖, here to help you discover books!"
 
-    # ------------------------------
+        # ------------------------------
     # Intent: search_top_rated
     # ------------------------------
     elif intent == "search_top_rated":
@@ -276,10 +276,19 @@ Thumbnail: {row['thumbnail']}"""
             response_text = "❌ I cannot provide top-rated books. The dataset is empty."
         else:
             try:
-                # Ensure numeric sorting (convert ratings if needed)
+                # Ensure numeric ratings
                 books_df["average_rating"] = pd.to_numeric(books_df["average_rating"], errors="coerce")
-                top_books = books_df.sort_values(by="average_rating", ascending=False).head(5)
-                msg = "🏆 Top Rated Books:\n"
+
+                # Get the maximum rating value
+                max_rating = books_df["average_rating"].max()
+
+                # Get all books with the highest rating
+                top_books = books_df[books_df["average_rating"] == max_rating]
+
+                # Randomly sample up to 5 books
+                top_books = top_books.sample(min(5, len(top_books)))
+
+                msg = "🏆 Top Rated Books (Random Selection):\n"
                 for _, row in top_books.iterrows():
                     msg += f"- {row['title']} by {row['author']} (⭐ {row['average_rating']})\n"
                 response_text = msg.strip()
@@ -296,3 +305,4 @@ Thumbnail: {row['thumbnail']}"""
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
+
