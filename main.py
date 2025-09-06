@@ -111,7 +111,7 @@ def webhook():
     # Intent: greet
     # ----------------------
     if intent == "greet":
-        response_text = "Hello! How can I help you with books today?"
+        response_text = "Hello! 👋 Welcome to the Online Reading Club. How can I help you?"
 
     # ----------------------
     # Intent: goodbye
@@ -128,40 +128,41 @@ def webhook():
             match = safe_search("title", title)
             if not match.empty:
                 row = match.iloc[0]
-                response_text = f"""I found a book 📕 for you!            
-Title: {row['title']}
-Author: {row['author']}
-Genre: {row['genre']}
-Publisher: {row['publisher']}
-Published Date: {row['published_date']}
-Pages: {row['pages']}
-Average Rating: {row['average_rating']}
-Description: {row['description']}
-Thumbnail: {row['thumbnail']}"""
+                response_text = f"""Here is the book 📕 for you!            
+📖 Title: {row['title']}
+👤 Author: {row['author']}
+📚 Genre: {row['genre']}
+🏢 Publisher: {row['publisher']}
+📅 Published Date: {row['published_date']}
+📄 Pages: {row['pages']}
+⭐ Average Rating: {row['average_rating']}
+📝 Description: {row['description']}
+📌 Thumbnail: {row['thumbnail']}"""
             else:
                 row = books_df.sample(1).iloc[0]
                 response_text = f"""Sorry, I couldn’t find a book titled '{title}'. 
-How about this one instead?
-Title: {row['title']}
-Author: {row['author']}
-Publisher: {row['publisher']}
-Published Date: {row['published_date']}
-Pages: {row['pages']}
-Average Rating: {row['average_rating']}
-Description: {row['description']}
-Thumbnail: {row['thumbnail']}"""
+How about this one 📙 instead?
+📖 Title: {row['title']}
+👤 Author: {row['author']}
+📚 Genre: {row['genre']}
+🏢 Publisher: {row['publisher']}
+📅 Published Date: {row['published_date']}
+📄 Pages: {row['pages']}
+⭐ Average Rating: {row['average_rating']}
+📝 Description: {row['description']}
+📌 Thumbnail: {row['thumbnail']}"""
         else:
             row = books_df.sample(1).iloc[0]
-            response_text = f"""I recommend this book for you:
-Title: {row['title']}
-Author: {row['author']}
-Genre: {row['genre']}
-Publisher: {row['publisher']}
-Published Date: {row['published_date']}
-Pages: {row['pages']}
-Average Rating: {row['average_rating']}
-Description: {row['description']}
-Thumbnail: {row['thumbnail']}"""
+            response_text = f"""I recommend this book 📙 for you:
+📖 Title: {row['title']}
+👤 Author: {row['author']}
+📚 Genre: {row['genre']}
+🏢 Publisher: {row['publisher']}
+📅 Published Date: {row['published_date']}
+📄 Pages: {row['pages']}
+⭐ Average Rating: {row['average_rating']}
+📝 Description: {row['description']}
+📌 Thumbnail: {row['thumbnail']}"""
 
     # ------------------------------
     # Intent: search_book_by_author
@@ -171,8 +172,8 @@ Thumbnail: {row['thumbnail']}"""
         if author:
             match = safe_search("author", author)
             if not match.empty:
-                titles = "\n".join(match["title"].tolist()[:5])
-                response_text = f"Books by {author.title()}:\n{titles}"
+                titles = "\n".join([f"{i+1}. {title}" for i, title in enumerate(match["title"].tolist()[:5])])
+                response_text = f"📚 Here are some books by {author.title()}:\n{titles}"
             else:
                 response_text = f"Sorry, I couldn’t find books from {author}."
         else:
@@ -186,7 +187,7 @@ Thumbnail: {row['thumbnail']}"""
         match = safe_search("title", title)
         if not match.empty:
             row = match.iloc[0]
-            response_text = f"'{row['title']}' has {row['pages']} pages."
+            response_text = f"📄'{row['title']}' has {row['pages']} pages."
         else:
             response_text = f"Sorry, I couldn’t find page count for '{title}'."
 
@@ -197,8 +198,8 @@ Thumbnail: {row['thumbnail']}"""
         genre = str(params.get("genre", ""))
         match = safe_search("genre", genre)
         if not match.empty:
-            titles = "\n".join(match["title"].tolist()[:5])
-            response_text = f"Here are some {genre.title()} books:\n{titles}"
+            titles = "\n".join([f"{i+1}. {title}" for i, title in enumerate(match["title"].tolist()[:5])])
+            response_text = f"📖 Found the following books in the '{genre.title()}' genre:\n{titles}"
         else:
             response_text = f"Sorry, I couldn’t find books in the {genre} genre."
 
@@ -210,7 +211,7 @@ Thumbnail: {row['thumbnail']}"""
         match = safe_search("title", title)
         if not match.empty:
             row = match.iloc[0]
-            response_text = f"'{row['title']}' description: {row['description']}"
+            response_text = f"📝 Description of '{row['title']}': {row['description']}"
         else:
             response_text = f"Sorry, I couldn’t find a description for '{title}'."
 
@@ -222,7 +223,7 @@ Thumbnail: {row['thumbnail']}"""
         match = safe_search("title", title)
         if not match.empty:
             row = match.iloc[0]
-            response_text = f"'{row['title']}' was published on {row['published_date']}."
+            response_text = f"📅'{row['title']}' was published on {row['published_date']}."
         else:
             response_text = f"Sorry, I couldn’t find the published date for '{title}'."
 
@@ -234,7 +235,7 @@ Thumbnail: {row['thumbnail']}"""
         match = safe_search("title", title)
         if not match.empty:
             row = match.iloc[0]
-            response_text = f"The publisher of '{row['title']}' is {row['publisher']}."
+            response_text = f"🏢 Publisher of '{row['title']}' is {row['publisher']}."
         else:
             response_text = f"Sorry, I couldn’t find the publisher for '{title}'."
 
@@ -246,7 +247,7 @@ Thumbnail: {row['thumbnail']}"""
         match = safe_search("title", title)
         if not match.empty:
             row = match.iloc[0]
-            response_text = f"'{row['title']}' has an average rating of {row['average_rating']}."
+            response_text = f"⭐'{row['title']}' has an average rating of {row['average_rating']}."
         else:
             response_text = f"Sorry, I couldn’t find ratings for '{title}'."
 
@@ -258,7 +259,7 @@ Thumbnail: {row['thumbnail']}"""
         match = safe_search("title", title)
         if not match.empty:
             row = match.iloc[0]
-            response_text = f"Here is the cover of '{row['title']}': {row['thumbnail']}"
+            response_text = f"📌 Thumbnail for '{row['title']}': {row['thumbnail']}: "
         else:
             response_text = f"Sorry, I couldn’t find a cover for '{title}'."
 
@@ -288,7 +289,7 @@ Thumbnail: {row['thumbnail']}"""
                 # Randomly sample up to 5 books
                 top_books = top_books.sample(min(5, len(top_books)))
 
-                msg = "🏆 Top Rated Books (Random Selection):\n"
+                msg = "🏆 Top Rated Books:\n"
                 for _, row in top_books.iterrows():
                     msg += f"- {row['title']} by {row['author']} (⭐ {row['average_rating']})\n"
                 response_text = msg.strip()
@@ -305,4 +306,3 @@ Thumbnail: {row['thumbnail']}"""
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
-
