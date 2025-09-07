@@ -119,6 +119,12 @@ def webhook():
     elif intent == "goodbye":
         response_text = "Goodbye! Happy reading 📖"
 
+    # ------------------------------
+    # Intent: bot_challenge
+    # ------------------------------
+    elif intent == "bot_challenge":
+        response_text = "I’m a book assistant bot 🤖, here to help you discover books!"
+
     # -----------------------------
     # Intent: search_book_by_title
     # -----------------------------
@@ -139,19 +145,15 @@ def webhook():
 📝 Description: {row['description']}
 📌 Thumbnail: {row['thumbnail']}"""
             else:
-                row = books_df.sample(1).iloc[0]
-                response_text = f"""Sorry, I couldn’t find a book titled '{title}'. 
-How about this one 📙 instead?
-📖 Title: {row['title']}
-👤 Author: {row['author']}
-📚 Genre: {row['genre']}
-🏢 Publisher: {row['publisher']}
-📅 Published Date: {row['published_date']}
-📄 Pages: {row['pages']}
-⭐ Average Rating: {row['average_rating']}
-📝 Description: {row['description']}
-📌 Thumbnail: {row['thumbnail']}"""
-        else:
+                response_text = f"Sorry, I couldn’t find a book titled '{title}'."
+
+    # -----------------------------
+    # Intent: recommend_book
+    # -----------------------------
+    elif intent == "recommend_book":
+        title = str(params.get("book_title", ""))
+        match = safe_search("title", title)
+        if not match.empty:
             row = books_df.sample(1).iloc[0]
             response_text = f"""I recommend this book 📙 for you:
 📖 Title: {row['title']}
@@ -180,18 +182,6 @@ How about this one 📙 instead?
             response_text = "Please provide an author name."
 
     # ------------------------------
-    # Intent: ask_number_of_pages
-    # ------------------------------
-    elif intent == "ask_number_of_pages":
-        title = str(params.get("book_title", ""))
-        match = safe_search("title", title)
-        if not match.empty:
-            row = match.iloc[0]
-            response_text = f"📄'{row['title']}' has {row['pages']} pages."
-        else:
-            response_text = f"Sorry, I couldn’t find page count for '{title}'."
-
-    # ------------------------------
     # Intent: search_book_by_genre
     # ------------------------------
     elif intent == "search_book_by_genre":
@@ -202,6 +192,18 @@ How about this one 📙 instead?
             response_text = f"📖 Found the following books in the '{genre.title()}' genre:\n{titles}"
         else:
             response_text = f"Sorry, I couldn’t find books in the {genre} genre."
+
+    # ------------------------------
+    # Intent: ask_number_of_pages
+    # ------------------------------
+    elif intent == "ask_number_of_pages":
+        title = str(params.get("book_title", ""))
+        match = safe_search("title", title)
+        if not match.empty:
+            row = match.iloc[0]
+            response_text = f"📄'{row['title']}' has {row['pages']} pages."
+        else:
+            response_text = f"Sorry, I couldn’t find page count for '{title}'."
 
     # ------------------------------
     # Intent: ask_book_description
@@ -252,24 +254,6 @@ How about this one 📙 instead?
             response_text = f"Sorry, I couldn’t find ratings for '{title}'."
 
     # ------------------------------
-    # Intent: ask_thumbnail
-    # ------------------------------
-    elif intent == "ask_thumbnail":
-        title = str(params.get("book_title", ""))
-        match = safe_search("title", title)
-        if not match.empty:
-            row = match.iloc[0]
-            response_text = f"📌 Thumbnail for '{row['title']}': {row['thumbnail']}: "
-        else:
-            response_text = f"Sorry, I couldn’t find a cover for '{title}'."
-
-    # ------------------------------
-    # Intent: bot_challenge
-    # ------------------------------
-    elif intent == "bot_challenge":
-        response_text = "I’m a book assistant bot 🤖, here to help you discover books!"
-
-        # ------------------------------
     # Intent: search_top_rated
     # ------------------------------
     elif intent == "search_top_rated":
@@ -295,6 +279,18 @@ How about this one 📙 instead?
                 response_text = msg.strip()
             except Exception as e:
                 response_text = f"❌ Error fetching top rated books: {str(e)}"
+
+    # ------------------------------
+    # Intent: ask_thumbnail
+    # ------------------------------
+    elif intent == "ask_thumbnail":
+        title = str(params.get("book_title", ""))
+        match = safe_search("title", title)
+        if not match.empty:
+            row = match.iloc[0]
+            response_text = f"📌 Thumbnail for '{row['title']}': {row['thumbnail']}: "
+        else:
+            response_text = f"Sorry, I couldn’t find a cover for '{title}'."
 
     # ------------------------------
     # Translate back to user's language
