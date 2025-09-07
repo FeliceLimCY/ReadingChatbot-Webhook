@@ -66,8 +66,9 @@ def translate_back(text: str, target_lang: str) -> str:
 def safe_detect_language(text: str) -> str:
     try:
         lang = detect(text)
-        if re.fullmatch(r"[A-Za-z0-9\s\?\!\'\,\.\-]+", text):
-            return "en"
+        # If text is too short (1–2 words), force translation attempt
+        if len(text.split()) <= 2 and lang == "en":
+            return "auto"
         return lang
     except:
         return "en"
@@ -302,3 +303,4 @@ def webhook():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
+
